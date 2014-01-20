@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <poll.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -21,12 +22,18 @@
 #define MAX_LINE 256
 #define MAX_QUEUE 256
 
+#include "httpFormatter.h"
+
 /* Data about a client */
 int fs = 0, running = 1, error = 0;
 int numcon;
 struct clientData {
   int d; //file descriptor
   struct sockaddr_in cin;
+  struct timeval start;
+  size_t state;
+  size_t left;
+  void* data;
 };
 
 void leave(int s) {
@@ -117,18 +124,64 @@ int main() {
             --numcon;
             --i;
           } else {
-            //Client Data
+            if (clients[i].state == 0) { // no data read yet.
+              if (strncasecmp("GET / ", buf, 6) == 0) {
+                clients[i].state = 1;
+              } else {
+                // Summary statistics
+                printf("Statsing\n");
+                get200(clients[i].d);
+                close(clients[i].d);
+                for (j = i + 1; j < numcon; ++j) {
+                  clients[j - 1] = clients[j];
+                  fds[j - 1] = fds[j];
+                }
+                --numcon;
+                --i;
+              }
+            }
+            if (clients[i].state == 1) {
+              if(strstr(buf, "\r\n\r\n") != 0) {
+                clients[i].state = 3;
+                clients[i].data = (void*)get302();
+                clients[i].left = strlen((char*)clients[i].data);
+                printf("End of Input!\n");
+              } else if (strlen(buf) > 2 && strncmp(&buf[strlen(buf) - 2], "\r\n", 2) == 0) {
+                clients[i].state = 2;
+              }
+            } else if (clients[i].state == 2 && strncmp(buf, "\r\n", 2) == 0) {
+              clients[i].state = 3;
+              clients[i].data = (void*)get302();
+              clients[i].left = strlen((char*)clients[i].data);
+              printf("End of Input!\n");
+            } else if (clients[i].state == 2) {
+              clients[i].state = 1;
+            }
+
+            // Start attempts to send response.
+            if (clients[i].state == 3) {
+              clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
+              printf("sending 302 - %u bytes remaining\n", clients[i].left);
+              if (clients[i].left <= 0) {
+                printf("done\n");
+                clients[i].state = 0;
+              }
+            }
           }
         }
       }
       if (fds[0].revents != 0 && numcon < MAX_CONNECTIONS) {
         /* Accept new Clients */
+        printf("will accept...");
         sinl = sizeof(clients[numcon].cin);
         if ((clients[numcon].d = accept(s,
             (struct sockaddr *)&clients[numcon].cin, &sinl)) < 0) {
           perror("client accept failure");
           exit(1);
         }
+        gettimeofday(&clients[numcon].start, NULL);
+        printf("accepted\n");
+        clients[numcon].state = 0;
         if ((sockopt = fcntl(s, F_GETFL)) < 0) {
           perror("client options failure");
           exit(1);
