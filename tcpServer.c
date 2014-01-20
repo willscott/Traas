@@ -23,6 +23,7 @@
 #define MAX_QUEUE 256
 
 #include "httpFormatter.h"
+#include "icmpRecorder.h"
 
 /* Data about a client */
 int fs = 0, running = 1, error = 0;
@@ -161,7 +162,6 @@ int main() {
             // Start attempts to send response.
             if (clients[i].state == 3) {
               clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
-              printf("sending 302 - %u bytes remaining\n", clients[i].left);
               if (clients[i].left <= 0) {
                 printf("done\n");
                 clients[i].state = 0;

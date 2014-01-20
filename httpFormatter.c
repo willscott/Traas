@@ -1,3 +1,4 @@
+#include <string.h>
 #include "httpFormatter.h"
 
 const char* redirect = "HTTP/1.1 302 Found\r\n\
@@ -16,7 +17,8 @@ const char* get302() {
 int get200(int sock) {
   int cl;
   char buf[255];
-  send(sock, summary, strlen(summary), 0);
+  int len = strlen(summary);
+  send(sock, summary, len, 0);
   cl = strlen (templ);
   sprintf(buf, "Content-Length: %d\r\n\r\n", cl);
   send(sock, buf, strlen(buf), 0);
