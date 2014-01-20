@@ -16,9 +16,9 @@ const char* get302() {
 int get200(int sock) {
   int cl;
   char buf[255];
-  send(sock, summary, sizeof(summary), 0);
-  cl = sizeof(templ);
+  send(sock, summary, strlen(summary), 0);
+  cl = strlen (templ);
   sprintf(buf, "Content-Length: %d\r\n\r\n", cl);
-  send(sock, buf, sizeof(buf), 0);
-  send(sock, templ, sizeof(templ), 0);
+  send(sock, buf, strlen(buf), 0);
+  send(sock, templ, strlen(templ), 0);
 };

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <strings.h>
 #include <sys/socket.h>
 
 const char* get302();
