@@ -4,6 +4,7 @@
  * Author: Will Scott (willscott@gmail.com) 2014
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -98,6 +99,8 @@ int main() {
   }
   numcon = 0;
 
+  beginCapture();
+
   while (running) {
     fds[0].fd = s;
     fds[0].events = POLLIN;
@@ -176,6 +179,9 @@ int main() {
         sinl = sizeof(clients[numcon].cin);
         if ((clients[numcon].d = accept(s,
             (struct sockaddr *)&clients[numcon].cin, &sinl)) < 0) {
+          if (errno == EAGAIN) {
+            continue;
+          }
           perror("client accept failure");
           exit(1);
         }
