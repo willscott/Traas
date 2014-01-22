@@ -10,6 +10,9 @@ void beginCapture() {
   bpf_u_int32 mask;
   bpf_u_int32 net;
 
+  struct bpf_program fp;
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed";
+
   // Find Device.
   dev = pcap_lookupdev(errbuf);
   if (dev == NULL) {
@@ -28,7 +31,17 @@ void beginCapture() {
   if (handle == NULL) {
     printf("Couldn't open device %s: %s\n", dev, errbuf);
     exit(1);
-  }  
+  }
+
+  // Set the filter.
+  if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
+    printf("Invalid Filter: %s\n", filter_exp);
+    exit(1);
+  }
+  if (pcap_setfilter(handle, &fp) == -1) {
+    printf("Filter couldn't be installed: %s\n", pcap_geterr(handle));
+    exit(1);
+  }
 };
 
 char* beginTrace(struct sockaddr_in* to) {
