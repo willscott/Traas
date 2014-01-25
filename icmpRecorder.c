@@ -4,7 +4,7 @@
 
 pcap_t *handle;
 
-void beginCapture() {
+int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
   //TODO(willscott): Remove IPv4 Limitation
   bpf_u_int32 mask;
@@ -42,6 +42,12 @@ void beginCapture() {
     printf("Filter couldn't be installed: %s\n", pcap_geterr(handle));
     exit(1);
   }
+
+  return pcap_get_selectable_fd(handle);
+};
+
+void processPcap() {
+  
 };
 
 char* beginTrace(struct sockaddr_in* to) {

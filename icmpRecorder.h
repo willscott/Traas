@@ -7,7 +7,9 @@ struct hop {
   
 };
 
-void beginCapture();
+int beginCapture();
+void processPcap();
+
 char* beginTrace(struct sockaddr_in* to);
 
 struct hop* infoFor(char* id);

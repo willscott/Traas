@@ -44,13 +44,13 @@ void leave(int s) {
 
 int main() {
   struct sockaddr_in sin;
-  int s;
+  int s, pcapfd;
   socklen_t sinl;
   struct clientData clients[MAX_CONNECTIONS];
   int i, j, len;
   int sockopt, one = 1;
   char buf[MAX_LINE];
-  struct pollfd fds[MAX_CONNECTIONS + 1];
+  struct pollfd fds[MAX_CONNECTIONS + 2];
 
   /* signals */
   signal (SIGINT, leave);
@@ -99,23 +99,25 @@ int main() {
   }
   numcon = 0;
 
-  beginCapture();
+  pcapfd = beginCapture();
 
   while (running) {
     fds[0].fd = s;
     fds[0].events = POLLIN;
+    fds[1].fd = pcapfd;
+    fds[1].events = POLLIN;
     for (i = 0; i < numcon; ++i) {
-      fds[i + 1].fd = clients[i].d;
-      fds[i + 1].events = POLLIN;
+      fds[i + 2].fd = clients[i].d;
+      fds[i + 2].events = POLLIN;
     }
     if (error > 0) {
       // TODO(willscott): Reset state.
       error = 0;
     }
-    if (poll(fds, numcon + 1, 100)) {
+    if (poll(fds, numcon + 2, 100)) {
       for (i = 0; i < numcon; ++i) {
         /* Read from an existing client */
-        if (fds[i + 1].revents != 0) {
+        if (fds[i + 2].revents != 0) {
           //printf("got client event\n");
           len = recv(clients[i].d, buf, sizeof(buf), 0);
           //Disconnect
@@ -123,7 +125,7 @@ int main() {
             close(clients[i].d);
             for (j = i + 1; j < numcon; ++j) {
               clients[j - 1] = clients[j];
-              fds[j - 1] = fds[j];
+              fds[j] = fds[j + 1];
             }
             --numcon;
             --i;
@@ -138,7 +140,7 @@ int main() {
                 close(clients[i].d);
                 for (j = i + 1; j < numcon; ++j) {
                   clients[j - 1] = clients[j];
-                  fds[j - 1] = fds[j];
+                  fds[j] = fds[j + 1];
                 }
                 --numcon;
                 --i;
@@ -197,6 +199,9 @@ int main() {
           exit(1);
         }
         numcon++;
+      }
+      if (fds[1].revents != 0) {
+        processPcap();
       }
     }
   }
