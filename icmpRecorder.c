@@ -47,7 +47,11 @@ int beginCapture() {
 };
 
 void processPcap() {
-  
+  struct pcap_pkthdr header;
+  const u_char *packet;
+  // TODO: should multiple packets be handled?
+  packet = pcap_next(handle, &header);
+  printf("Jacked a packet with length of [%d]\n", header.len);
 };
 
 char* beginTrace(struct sockaddr_in* to) {
