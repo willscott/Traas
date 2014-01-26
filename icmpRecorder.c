@@ -1,8 +1,11 @@
 #include <pcap.h>
 #include <stdlib.h>
 #include "icmpRecorder.h"
+#include "tcpServer.h"
 
 pcap_t *handle;
+struct trace* activeTraces[MAX_CONNECTIONS];
+size_t activeTraceCount = 0;
 
 int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
@@ -54,8 +57,27 @@ void processPcap() {
   printf("Jacked a packet with length of [%d]\n", header.len);
 };
 
-char* beginTrace(struct sockaddr_in* to) {
+void* beginTrace(struct sockaddr_in* to) {
+  struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
+  tr->to = to->sin_addr.s_addr;
+  activeTraces[activeTraceCount];
+  activeTraceCount += 1;
+  return tr;
 };
 
-struct hop* infoFor(char* id) {
+struct hop* showTrace(void* id) {
+  struct trace* r = (struct trace*)id;
+  return r->hops;
+};
+
+void cleanupTrace(void* id) {
+  size_t i;
+  for (i = activeTraceCount - 1; i >= 0; i--) {
+    if (activeTraces[i] == id) {
+      break;
+    }
+  }
+  activeTraces[i] = activeTraces[activeTraceCount - 1];
+  activeTraceCount -= 1;
+  free(id);
 };

@@ -17,12 +17,8 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
-#define PORT 8080
-#define MAX_PENDING 5
-#define MAX_CONNECTIONS 9
-#define MAX_LINE 256
-#define MAX_QUEUE 256
 
+#include "tcpServer.h"
 #include "httpFormatter.h"
 #include "icmpRecorder.h"
 
