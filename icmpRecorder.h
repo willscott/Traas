@@ -15,6 +15,48 @@ struct trace {
   struct hop hops[MAX_HOPS];
 };
 
+struct pktinfo {
+  // IP
+  unsigned int version : 4;
+  unsigned int ihl : 4;
+  unsigned int dscp : 6;
+  unsigned int ecn : 2;
+  unsigned short length;
+  unsigned short id;
+  unsigned short fragment;
+  unsigned char ttl;
+  unsigned char proto;
+  unsigned short checksum;
+  unsigned int source;
+  unsigned int dest;
+  // ICMP
+  unsigned char type;
+  unsigned char code;
+  unsigned short i_checksum;
+  unsigned int padding;
+  // IP [inner]
+  unsigned int e_version : 4;
+  unsigned int e_ihl : 4;
+  unsigned int e_dscp : 6;
+  unsigned int e_ecn : 2;
+  unsigned short e_length;
+  unsigned short e_id;
+  unsigned short e_fragment;
+  unsigned char e_ttl;
+  unsigned char e_proto;
+  unsigned short e_checksum;
+  unsigned int e_source;
+  unsigned int e_dest;
+  // TCP [inner]
+  unsigned short sport;
+  unsigned short dport;
+  unsigned int seq;
+  unsigned int ack;
+  unsigned short flags;
+  unsigned short winsize;
+  unsigned short tcp_sum;
+};
+
 int beginCapture();
 void processPcap();
 

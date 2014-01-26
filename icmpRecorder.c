@@ -51,10 +51,13 @@ int beginCapture() {
 
 void processPcap() {
   struct pcap_pkthdr header;
-  const u_char *packet;
+  struct pktinfo *packet;
   // TODO: should multiple packets be handled?
-  packet = pcap_next(handle, &header);
-  printf("Jacked a packet with length of [%d]\n", header.len);
+  packet = (struct pktinfo*)pcap_next(handle, &header);
+  if (header.len >= 66) {
+    // Enough to have tcp header through checksum:
+    // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
+  }
 };
 
 void* beginTrace(struct sockaddr_in* to) {
