@@ -14,7 +14,7 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed";
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (tcp port 80 and src host localhost)";
 
   // Find Device.
   dev = pcap_lookupdev(errbuf);
@@ -56,7 +56,7 @@ void processPcap() {
   unsigned short hop;
   // TODO: should multiple packets be handled?
   packet = (struct pktinfo*)pcap_next(handle, &header);
-  if (header.len >= 66) {
+  if (header.caplen >= 66 && packet->proto == 1) {
     // Enough to have tcp header through checksum:
     // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
     if (packet->e_version == 4 && packet->e_proto == 6) {
@@ -73,6 +73,8 @@ void processPcap() {
         }
       }
     }
+  } else if (header.caplen >= 40 && packet->proto == 6) {
+    // Log
   }
 };
 
