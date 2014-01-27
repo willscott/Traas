@@ -79,6 +79,7 @@ void processPcap() {
 void* beginTrace(struct sockaddr_in* to) {
   struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
   tr->to = to->sin_addr.s_addr;
+  tr->recordedHops = 0;
   activeTraces[activeTraceCount];
   activeTraceCount += 1;
   return tr;
