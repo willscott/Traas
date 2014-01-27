@@ -16,6 +16,11 @@ struct trace {
   struct hop hops[MAX_HOPS];
 };
 
+struct seqreq {
+  int to;
+  int seq;
+};
+
 struct pktinfo {
   // IP
   unsigned int version : 4;
@@ -66,3 +71,4 @@ void* beginTrace(struct sockaddr_in* to);
 struct hop* showTrace(void* id);
 void cleanupTrace(void* id);
 
+void craftPkt(unsigned int to, unsigned int seq);

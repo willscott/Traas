@@ -6,6 +6,8 @@
 pcap_t *handle;
 struct trace* activeTraces[MAX_CONNECTIONS];
 size_t activeTraceCount = 0;
+struct seqreq seqnums[100];
+size_t seqnumpos = 0;
 
 int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
@@ -73,17 +75,41 @@ void processPcap() {
         }
       }
     }
-  } else if (header.caplen >= 40 && packet->proto == 6) {
+  } else if (header.caplen >= 33 && packet->proto == 6) {
     // Log
+    seqnums[seqnumpos].to = packet->dest;
+    seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->length -\
+        ((((char*)packet)[32] & 0xf0)>>2);
+    seqnumpos += 1;
+    seqnumpos %= 100;
   }
 };
 
 void* beginTrace(struct sockaddr_in* to) {
+  int i, m, seq;
   struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
   tr->to = to->sin_addr.s_addr;
   tr->recordedHops = 0;
   activeTraces[activeTraceCount];
   activeTraceCount += 1;
+
+  // Send the probes.
+  for (m = 0; m < 100; m++) {
+    i = (seqnumpos - m - 1) % 100;
+    if (seqnums[i].to == tr->to) {
+      seq = seqnums[i].seq;
+      break;
+    }
+  }
+  if (seq == 0) {
+    cleanupTrace(tr);
+    return 0;
+  }
+
+  for (i = 0; i < MAX_HOPS; i++) {
+    craftPkt(tr->to, seq);
+  }
+
   return tr;
 };
 
@@ -102,4 +128,7 @@ void cleanupTrace(void* id) {
   activeTraces[i] = activeTraces[activeTraceCount - 1];
   activeTraceCount -= 1;
   free(id);
+};
+
+void craftPkt(unsigned int to, unsigned int seq) {
 };
