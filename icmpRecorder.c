@@ -52,11 +52,27 @@ int beginCapture() {
 void processPcap() {
   struct pcap_pkthdr header;
   struct pktinfo *packet;
+  int i;
+  unsigned short hop;
   // TODO: should multiple packets be handled?
   packet = (struct pktinfo*)pcap_next(handle, &header);
   if (header.len >= 66) {
     // Enough to have tcp header through checksum:
     // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
+    if (packet->e_version == 4 && packet->e_proto == 6) {
+      // Original packet should have been ipv4 tcp.
+      for (i = 0; i < activeTraceCount; i++) {
+        if (activeTraces[i]->to == packet->e_dest) {
+          // Part of active trace.
+          hop = activeTraces[i]->recordedHops;
+          activeTraces[i]->hops[hop].ip = packet->source;
+          activeTraces[i]->hops[hop].ttl = packet->e_ttl;
+          activeTraces[i]->hops[hop].len = header.len;
+          activeTraces[i]->recordedHops += 1;
+          break;
+        }
+      }
+    }
   }
 };
 
