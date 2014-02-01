@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "icmpRecorder.h"
 #include "tcpServer.h"
+#include "tcpSender.h"
 
 pcap_t *handle;
 struct trace* activeTraces[MAX_CONNECTIONS];
@@ -128,7 +129,4 @@ void cleanupTrace(void* id) {
   activeTraces[i] = activeTraces[activeTraceCount - 1];
   activeTraceCount -= 1;
   free(id);
-};
-
-void craftPkt(unsigned int to, unsigned int seq) {
 };
