@@ -53,30 +53,38 @@ int beginCapture() {
 };
 
 void processPcap() {
-  struct pcap_pkthdr header;
+  int ret = pcap_dispatch(handle, 0, handlePcap, 0);
+  if (ret < 0) {
+    pcap_perror(handle, "pcap");
+  }
+}
+
+void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes) {
   struct pktinfo *packet;
   int i;
   unsigned short hop;
   // TODO: should multiple packets be handled?
-  packet = (struct pktinfo*)pcap_next(handle, &header);
-  if (header.caplen >= 66 && packet->proto == 1) {
+  packet = (struct pktinfo*)bytes;
+  printf("got packet.\n");
+  if (header->caplen >= 66 && packet->proto == 1) {
     // Enough to have tcp header through checksum:
     // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
     if (packet->e_version == 4 && packet->e_proto == 6) {
       // Original packet should have been ipv4 tcp.
       for (i = 0; i < activeTraceCount; i++) {
         if (activeTraces[i]->to == packet->e_dest) {
+          printf("got relevant traced packet.\n");
           // Part of active trace.
           hop = activeTraces[i]->recordedHops;
           activeTraces[i]->hops[hop].ip = packet->source;
           activeTraces[i]->hops[hop].ttl = packet->e_ttl;
-          activeTraces[i]->hops[hop].len = header.len;
+          activeTraces[i]->hops[hop].len = header->len;
           activeTraces[i]->recordedHops += 1;
           break;
         }
       }
     }
-  } else if (header.caplen >= 33 && packet->proto == 6) {
+  } else if (header->caplen >= 33 && packet->proto == 6) {
     // Log
     seqnums[seqnumpos].to = packet->dest;
     seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->length -\
@@ -91,7 +99,7 @@ void* beginTrace(struct sockaddr_in* to) {
   struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
   tr->to = to->sin_addr.s_addr;
   tr->recordedHops = 0;
-  activeTraces[activeTraceCount];
+  activeTraces[activeTraceCount] = tr;
   activeTraceCount += 1;
 
   // Send the probes.
@@ -121,7 +129,7 @@ struct hop* showTrace(void* id) {
 
 void cleanupTrace(void* id) {
   size_t i;
-  for (i = activeTraceCount - 1; i >= 0; i--) {
+  for (i = activeTraceCount - 1; i > 0; i--) {
     if (activeTraces[i] == id) {
       break;
     }

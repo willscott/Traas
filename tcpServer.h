@@ -3,3 +3,4 @@
 #define MAX_CONNECTIONS 10
 #define MAX_LINE 256
 #define MAX_QUEUE 256
+#define MAX_TTL 64

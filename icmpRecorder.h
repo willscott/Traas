@@ -65,6 +65,7 @@ struct pktinfo {
 
 int beginCapture();
 void processPcap();
+void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes);
 
 void* beginTrace(struct sockaddr_in* to);
 

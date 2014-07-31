@@ -14,7 +14,7 @@ const char* get302() {
   return redirect;
 };
 
-int get200(int sock) {
+int send200(int sock) {
   int cl;
   char buf[255];
   int len = strlen(summary);
@@ -23,4 +23,5 @@ int get200(int sock) {
   sprintf(buf, "Content-Length: %d\r\n\r\n", cl);
   send(sock, buf, strlen(buf), 0);
   send(sock, templ, strlen(templ), 0);
+  return 0;
 };

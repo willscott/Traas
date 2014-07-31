@@ -28,7 +28,13 @@ int numcon;
 struct clientData {
   int d; //file descriptor
   struct sockaddr_in cin;
+  unsigned short ttl;
   struct timeval start;
+  /*
+   * state = 0 -> new connection
+   * state = 1 -> client has asked for 'get'
+   * state = 2 -> 
+   */
   size_t state;
   size_t left;
   void* data;
@@ -44,6 +50,7 @@ int main() {
   socklen_t sinl;
   struct clientData clients[MAX_CONNECTIONS];
   int i, j, len;
+  int dataoffset = 0;
   int sockopt, one = 1;
   char buf[MAX_LINE];
   struct pollfd fds[MAX_CONNECTIONS + 2];
@@ -132,7 +139,7 @@ int main() {
               } else {
                 // Summary statistics
                 printf("Statsing\n");
-                get200(clients[i].d);
+                send200(clients[i].d);
                 close(clients[i].d);
                 for (j = i + 1; j < numcon; ++j) {
                   clients[j - 1] = clients[j];
@@ -145,6 +152,7 @@ int main() {
             if (clients[i].state == 1) {
               if(strstr(buf, "\r\n\r\n") != 0) {
                 clients[i].state = 3;
+                clients[i].ttl = 1;
                 clients[i].data = (void*)get302();
                 clients[i].left = strlen((char*)clients[i].data);
                 printf("End of Input!\n");
@@ -161,11 +169,23 @@ int main() {
             }
 
             // Start attempts to send response.
+            if (clients[i].state == 4) {
+              if (clients[i].ttl > MAX_TTL) {
+                clients[i].state = 0;
+              } else {
+                clients[i].ttl += 1;
+                clients[i].state = 3;
+              }
+            }
+
             if (clients[i].state == 3) {
-              clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
+              setsockopt(clients[i].d, IPPROTO_IP, IP_TTL, &clients[i].ttl, sizeof(clients[i].ttl));
+              dataoffset = clients[i].left - strlen((char*)clients[i].data);
+              clients[i].left -= send(clients[i].d, clients[i].data + dataoffset, clients[i].left, 0);
               if (clients[i].left <= 0) {
                 printf("done\n");
-                clients[i].state = 0;
+                clients[i].left = strlen((char*)clients[i].data);
+                clients[i].state = 4;
               }
             }
           }
