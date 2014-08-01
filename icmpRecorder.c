@@ -1,10 +1,10 @@
-#include <pcap.h>
 #include <stdlib.h>
 #include "icmpRecorder.h"
 #include "tcpServer.h"
 #include "tcpSender.h"
 
 pcap_t *handle;
+unsigned int sendingAddress;
 struct trace* activeTraces[MAX_CONNECTIONS];
 size_t activeTraceCount = 0;
 struct seqreq seqnums[100];
@@ -48,6 +48,9 @@ int beginCapture() {
     printf("Filter couldn't be installed: %s\n", pcap_geterr(handle));
     exit(1);
   }
+
+  // Initialize Sending.
+  initSender();
 
   return pcap_get_selectable_fd(handle);
 };
@@ -94,13 +97,21 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   }
 };
 
-void* beginTrace(struct sockaddr_in* to) {
+void* beginTrace(int d, struct sockaddr_in* to) {
+  struct sockaddr_in local;
   int i, m, seq;
   struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
   tr->to = to->sin_addr.s_addr;
   tr->recordedHops = 0;
   activeTraces[activeTraceCount] = tr;
   activeTraceCount += 1;
+
+  // Get local address if needed.
+  if (!sendingAddress) {
+    i = sizeof(local);
+    getsockname(d, (struct sockaddr*)&local, (socklen_t *)&i);
+    sendingAddress = local.sin_addr.s_addr;
+  }
 
   // Send the probes.
   for (m = 0; m < 100; m++) {
@@ -116,7 +127,7 @@ void* beginTrace(struct sockaddr_in* to) {
   }
 
   for (i = 0; i < MAX_HOPS; i++) {
-    craftPkt(tr->to, seq);
+    craftPkt(tr->to, to->sin_port, sendingAddress, seq, i);
   }
 
   return tr;

@@ -1,6 +1,10 @@
+#include <pcap.h>
 #include <sys/socket.h>
 #include <stdint.h>
 #include <netinet/in.h>
+
+#ifndef   ICMP_H
+#define   ICMP_H
 
 #define MAX_HOPS 32
 
@@ -67,9 +71,9 @@ int beginCapture();
 void processPcap();
 void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes);
 
-void* beginTrace(struct sockaddr_in* to);
+void* beginTrace(int d, struct sockaddr_in* to);
 
 struct hop* showTrace(void* id);
 void cleanupTrace(void* id);
 
-void craftPkt(unsigned int to, unsigned int seq);
+#endif
