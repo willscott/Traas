@@ -15,7 +15,13 @@ struct tcp_pseudohdr {
   unsigned short len;
 };
 
+#define TCPHSIZE 20
+#define PTCPHSIZE 12
+#define IPHSIZE 20
+
 unsigned short checksum(unsigned short *buffer, int size) {
+  // convert from num bytes to num shorts.
+  size = size >> 1;
   unsigned long cksum = 0;
   while(size > 1) {
     cksum += *buffer++;
@@ -34,7 +40,7 @@ void initSender() {
   int b;
   struct linger linger;
 
-  osock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+  osock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
   if (osock == -1) {
     printf("Socket() failed.\n");
     return;
@@ -59,12 +65,15 @@ void initSender() {
 };
 
 void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned char ttl) {
+  char* payload = "PING";
+
   struct sockaddr_in dest;
   char data[4096];
   struct ip* ip_hdr = (struct ip*) data;
   struct tcphdr* tcp_hdr = (struct tcphdr*) (data + sizeof(struct ip));
   struct tcp_pseudohdr* fake_hdr = (struct tcp_pseudohdr*)
       (data + sizeof(struct ip) - sizeof(struct tcp_pseudohdr));
+  unsigned short plen = strlen(payload);
   memset(data, 0, sizeof(data));
   dest.sin_family = AF_INET;
   dest.sin_addr.s_addr = to;
@@ -83,10 +92,13 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   fake_hdr->dst = to;
   fake_hdr->zeros = 0;
   fake_hdr->proto = 6;
-  fake_hdr->len = sizeof(struct tcphdr);
+  fake_hdr->len = htons(TCPHSIZE);
+
+  /* Fill in payload */
+  memcpy(data + IPHSIZE + TCPHSIZE, payload, plen);
 
   /* Compute TCP Checksum */
-  tcp_hdr->th_sum = checksum((unsigned short *) fake_hdr, (fake_hdr->len + 12) >> 1);
+  tcp_hdr->th_sum = checksum((unsigned short *) fake_hdr, TCPHSIZE + PTCPHSIZE + plen);
 
   /* Revert Pseudo header */
   memset(data, 0, sizeof(struct ip));
@@ -95,21 +107,25 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   ip_hdr->ip_hl = 5;
   ip_hdr->ip_v = 4;
   ip_hdr->ip_tos = 0;
-  ip_hdr->ip_len = htons(sizeof (struct ip) + sizeof (struct tcphdr));
-  ip_hdr->ip_id = 0x1000;
+  // packet len filled in by kernel.
+  // ip_hdr->ip_len = htons(IPHSIZE + TCPHSIZE);
+  // packet id filled in when 0
+  // ip_hdr->ip_id = 0x1000;
   ip_hdr->ip_off = 0;
   ip_hdr->ip_ttl = ttl; //TTL
   ip_hdr->ip_p = 6;
   ip_hdr->ip_sum = 0;
-  ip_hdr->ip_src.s_addr = from;
+  // source address filled in when 0
+  //  ip_hdr->ip_src.s_addr = from;
   ip_hdr->ip_dst.s_addr = to;
 
   /* Compute IP Checksum */
-  ip_hdr->ip_sum = checksum((unsigned short *)data, ip_hdr->ip_len >> 1);
+  // ip checksum auto-calculated by kernel.
+  //ip_hdr->ip_sum = checksum((unsigned short *)data, IPHSIZE);
 
-	printf("Attempting to send pkt at ttl %d to %d with len %d\n", ttl, to, sizeof (struct ip) + sizeof (struct tcphdr));
+  printf("Attempting to send pkt with args: %d, %d, 0, %d", osock, IPHSIZE + TCPHSIZE + plen, sizeof(dest));
 
-  if(sendto(osock, data, sizeof (struct ip) + sizeof (struct tcphdr), 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
+  if(sendto(osock, data, IPHSIZE + TCPHSIZE + plen, 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
     int errsv = errno;
 		perror("sendto");
     printf("sendto() failed: %d\n", errsv);
