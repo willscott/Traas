@@ -12,6 +12,7 @@ size_t seqnumpos = 0;
 
 int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
+  pcap_if_t *alldevsp, *devsp;
   //TODO(willscott): Remove IPv4 Limitation
   bpf_u_int32 mask;
   bpf_u_int32 net;
@@ -20,11 +21,26 @@ int beginCapture() {
   char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (tcp port 80 and src host localhost)";
 
   // Find Device.
-  dev = pcap_lookupdev(errbuf);
-  if (dev == NULL) {
-    printf("No valid device found! %s \n", errbuf);
+  if (pcap_findalldevs(&alldevsp, errbuf)) {
+    printf("Couldn't find Devices: %s \n", errbuf);
     exit(1);
   }
+  devsp = alldevsp;
+  dev = NULL;
+  while (devsp != NULL) {
+    // flags = !loopback
+    if (devsp->addresses != NULL && (devsp->flags & 1) != 1) {
+      dev = devsp->name;
+      break;
+    } else {
+      devsp = devsp->next;
+    }
+  }
+  if (dev == NULL) {
+    printf("No valid device found!\n");
+    exit(1);
+  }
+  printf("Using Dev %s\n", dev);
 
   // Get Local IP.
   if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
@@ -38,6 +54,9 @@ int beginCapture() {
     printf("Couldn't open device %s: %s\n", dev, errbuf);
     exit(1);
   }
+
+  // free list
+  pcap_freealldevs(alldevsp);
 
   // Set the filter.
   if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {

@@ -5,6 +5,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
+#include <sys/ioctl.h>
+#include <bits/ioctls.h>
+#include <net/if.h>
 #include "tcpSender.h"
 
 struct tcp_pseudohdr {
@@ -36,10 +39,13 @@ unsigned short checksum(unsigned short *buffer, int size) {
 }
 
 int osock;
+struct ifreq ifr;
+
 void initSender() {
   int b;
   struct linger linger;
 
+  printf("making raw socket.\n");
   osock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
   if (osock == -1) {
     printf("Socket() failed.\n");
@@ -60,6 +66,18 @@ void initSender() {
   b = 1;
   if(setsockopt(osock, IPPROTO_IP, IP_HDRINCL, &b, sizeof(b)) == -1) {
     printf("setsockopt() failed.\n");
+    return;
+  }
+
+  // Select device (linux)
+  memset(&ifr, 0, sizeof(ifr));
+  memcpy(ifr.ifr_name, "eth2", 4);
+  if(ioctl(osock, SIOCGIFINDEX, &ifr) < 0) {
+    printf("ioctl failed.\n");
+    return;
+  }
+  if(setsockopt(osock, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) < 0) {
+    printf("bind failed.\n");
     return;
   }
 };
