@@ -56,7 +56,6 @@ void initSender() {
     printf("setsockopt() failed.\n");
     return;
   }
-  printf("Raw Socket Initialized.\n");
 };
 
 void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned char ttl) {
@@ -110,8 +109,9 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
 
 	printf("Attempting to send pkt at ttl %d to %d with len %d\n", ttl, to, sizeof (struct ip) + sizeof (struct tcphdr));
 
-  if(sendto(osock, &data, sizeof (struct ip) + sizeof (struct tcphdr), 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
+  if(sendto(osock, data, sizeof (struct ip) + sizeof (struct tcphdr), 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
     int errsv = errno;
+		perror("sendto");
     printf("sendto() failed: %d\n", errsv);
   }
 };

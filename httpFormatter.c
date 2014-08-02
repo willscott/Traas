@@ -14,10 +14,11 @@ const char* get302() {
 
 int send200(int sock, struct hop* trace) {
   int cl;
-  int hops;
+  int hops, maxHops;
   char head[255];
   char buf[2048];
-  while (&trace != 0) {
+  maxHops = 255;
+  while (&trace != 0 && hops < maxHops) {
     hops += 1;
     trace += 1;
   }

@@ -167,6 +167,10 @@ int main() {
             } else if (clients[i].state == 2) {
               clients[i].state = 1;
             }
+            if (clients[i].state == 3) {
+              printf("Client ack received in-line. Finishing Trace.\n");
+              clients[i].state = 4;
+            }
 
             if (clients[i].state == 4) {
               clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
