@@ -6,7 +6,6 @@
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
 #include <sys/ioctl.h>
-#include <bits/ioctls.h>
 #include <net/if.h>
 #include "tcpSender.h"
 
@@ -70,6 +69,7 @@ void initSender() {
   }
 
   // Select device (linux)
+#ifdef SIOCGIFINDEX
   memset(&ifr, 0, sizeof(ifr));
   memcpy(ifr.ifr_name, "eth2", 4);
   if(ioctl(osock, SIOCGIFINDEX, &ifr) < 0) {
@@ -80,6 +80,8 @@ void initSender() {
     printf("bind failed.\n");
     return;
   }
+#endif
+
 };
 
 void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned char ttl) {
@@ -99,11 +101,12 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
 
   /* Fill in TCP */
   tcp_hdr->th_sport = htons(8080);
-  tcp_hdr->th_dport = htons(port);
+  tcp_hdr->th_dport = port;
   tcp_hdr->th_seq = seq;
   tcp_hdr->th_ack = 0;
   tcp_hdr->th_win = htons(65535);
   tcp_hdr->th_sum = 0;
+  tcp_hdr->th_off = 5;
 
   /* Fill in Pseudo header */
   fake_hdr->src = from;
