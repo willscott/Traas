@@ -18,6 +18,7 @@ struct hop {
 
 struct trace {
   int to;
+  int sent;
   unsigned short recordedHops;
   struct hop hops[MAX_HOPS];
 };

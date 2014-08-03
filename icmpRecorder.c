@@ -100,8 +100,6 @@ void processPcap() {
   if (ret < 0) {
     pcap_perror(handle, "pcap");
   }
-  printf("%d packets seen, %d packets counted after select returns\n",
-  				    ret, packet_count);
 }
 
 void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes) {
@@ -148,12 +146,14 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
     // see if this is for an active trace.
 
     for (i = 0; i < activeTraceCount; i++) {
-      if (activeTraces[i]->to == iphdr->ip_dst.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK) {
+      if (activeTraces[i]->to == iphdr->ip_dst.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK &&
+          activeTraces[i]->sent == 0) {
         // Latched on to active request.
         printf("seq recovered %s -> %d\n", inet_ntoa(iphdr->ip_dst), tcphdr->th_seq);
         for (j = 0; j < MAX_HOPS; j++) {
           craftPkt(activeTraces[i]->to, tcphdr->th_dport, sendingAddress, tcphdr->th_seq, j);
         }
+        activeTraces[i]->sent = 1;
       }
     }
   }
@@ -164,6 +164,7 @@ void* beginTrace(int d, struct sockaddr_in* to) {
   int i, m, seq;
   struct trace* tr = (struct trace*)malloc(sizeof(struct trace));
   tr->to = to->sin_addr.s_addr;
+  tr->sent = 0;
   tr->recordedHops = 0;
   activeTraces[activeTraceCount] = tr;
   activeTraceCount += 1;

@@ -144,11 +144,9 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   // ip checksum auto-calculated by kernel.
   //ip_hdr->ip_sum = checksum((unsigned short *)data, IPHSIZE);
 
-  printf("Attempting to send pkt with args: %d, %d, 0, %d", osock, IPHSIZE + TCPHSIZE + plen, sizeof(dest));
-
   if(sendto(osock, data, IPHSIZE + TCPHSIZE + plen, 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
     int errsv = errno;
-		perror("sendto");
+    perror("sendto");
     printf("sendto() failed: %d\n", errsv);
   }
 };
