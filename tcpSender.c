@@ -132,7 +132,7 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   // ip_hdr->ip_len = htons(IPHSIZE + TCPHSIZE);
   // packet id filled in when 0
   // ip_hdr->ip_id = 0x1000;
-  ip_hdr->ip_off = IP_DF;
+  ip_hdr->ip_off = htons(IP_DF);
   ip_hdr->ip_ttl = ttl; //TTL
   ip_hdr->ip_p = 6;
   ip_hdr->ip_sum = 0;
