@@ -10,8 +10,6 @@ pcap_t *handle;
 unsigned int sendingAddress;
 struct trace* activeTraces[MAX_CONNECTIONS];
 size_t activeTraceCount = 0;
-struct seqreq seqnums[100];
-size_t seqnumpos = 0;
 
 int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
@@ -114,7 +112,7 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
 
   int icmpLength = linkhdrlen + sizeof(struct ip) + sizeof(struct icmp) + sizeof(struct ip);
   
-  int i;
+  int i, j;
   unsigned short hop;
 
   // Make sure it's valid IP.
@@ -147,14 +145,17 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
     }
   } else if (header->caplen >= linkhdrlen + sizeof(struct ip) + sizeof(struct tcphdr) && iphdr->ip_p == 6) {
     tcphdr = (struct tcphdr*)(bytes + linkhdrlen + sizeof(struct ip));
-    // Log
-    seqnums[seqnumpos].to = iphdr->ip_dst.s_addr;
-    seqnums[seqnumpos].seq = tcphdr->th_seq;
-    struct in_addr des;
-    des.s_addr = iphdr->ip_dst.s_addr;
-    printf("seq recovered %s -> %d\n", inet_ntoa(des), seqnums[seqnumpos].seq);
-    seqnumpos += 1;
-    seqnumpos %= 100;
+    // see if this is for an active trace.
+
+    for (i = 0; i < activeTraceCount; i++) {
+      if (activeTraces[i]->to == iphdr->ip_dst.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK) {
+        // Latched on to active request.
+        printf("seq recovered %s -> %d\n", inet_ntoa(iphdr->ip_dst), tcphdr->th_seq);
+        for (j = 0; j < MAX_HOPS; j++) {
+          craftPkt(activeTraces[i]->to, tcphdr->th_dport, sendingAddress, tcphdr->th_seq, j);
+        }
+      }
+    }
   }
 };
 
@@ -172,25 +173,6 @@ void* beginTrace(int d, struct sockaddr_in* to) {
     i = sizeof(local);
     getsockname(d, (struct sockaddr*)&local, (socklen_t *)&i);
     sendingAddress = local.sin_addr.s_addr;
-  }
-
-  // Send the probes.
-  seq = 0;
-  for (m = 0; m < 100; m++) {
-    i = (seqnumpos - m - 1) % 100;
-    if (seqnums[i].to == tr->to) {
-      seq = seqnums[i].seq;
-      printf("Sequence Number recovered: %d\n", seq);
-      break;
-    }
-  }
-  if (seq == 0) {
-    cleanupTrace(tr);
-    return 0;
-  }
-
-  for (i = 0; i < MAX_HOPS; i++) {
-    craftPkt(tr->to, to->sin_port, sendingAddress, seq, i);
   }
 
   return tr;
