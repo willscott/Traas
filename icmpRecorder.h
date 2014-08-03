@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <stdint.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #ifndef   ICMP_H
 #define   ICMP_H

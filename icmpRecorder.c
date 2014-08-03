@@ -111,6 +111,9 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
     seqnums[seqnumpos].to = packet->dest;
     seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->length -\
         ((((char*)packet)[32] & 0xf0)>>2);
+    struct in_addr des;
+    des.s_addr = packet->dest;
+    printf("seq recovered %s -> %d\n", inet_ntoa(des), seqnums[seqnumpos].seq);
     seqnumpos += 1;
     seqnumpos %= 100;
   }
