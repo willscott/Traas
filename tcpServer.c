@@ -148,6 +148,10 @@ int main() {
                 --i;
               }
             }
+            if (clients[i].state == 3) {
+              printf("First ack received. Trace ready.\n");
+              clients[i].state = 4;
+            }
             if (clients[i].state == 1) {
               if(strstr(buf, "\r\n\r\n") != 0) {
                 clients[i].state = 3;
@@ -167,20 +171,12 @@ int main() {
             } else if (clients[i].state == 2) {
               clients[i].state = 1;
             }
-            if (clients[i].state == 3) {
-              printf("First ack received. Trace ready.\n");
-              clients[i].state = 4;
-            }
-            if (clients[i].state == 4) {
-              printf("Second ack received. Trace Done.\n");
-              clients[i].state = 5;
-            }
 
-            if (clients[i].state == 5) {
+            if (clients[i].state == 4) {
               clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
               if (clients[i].left <= 0) {
                 printf("done\n");
-                clients[i].state = 6;
+                clients[i].state = 5;
               }
             }
           }
