@@ -133,10 +133,12 @@ void* beginTrace(int d, struct sockaddr_in* to) {
   }
 
   // Send the probes.
+  seq = 0;
   for (m = 0; m < 100; m++) {
     i = (seqnumpos - m - 1) % 100;
     if (seqnums[i].to == tr->to) {
       seq = seqnums[i].seq;
+      printf("Sequence Number recovered: %d\n", seq);
       break;
     }
   }
