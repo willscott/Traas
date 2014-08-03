@@ -18,7 +18,8 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (tcp port 8080)";
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (dst port 8080 and dst host %s)";
+  char filterbuf[256];
 
   // Find Device.
   if (pcap_findalldevs(&alldevsp, errbuf)) {
@@ -29,9 +30,22 @@ int beginCapture() {
   dev = NULL;
   while (devsp != NULL) {
     // flags = !loopback
+    char* addr = NULL;
     if (devsp->addresses != NULL && (devsp->flags & 1) != 1) {
-      dev = devsp->name;
-      break;
+      struct pcap_addr* addrs = devsp->addresses;
+      while (addrs != NULL) {
+        if (addrs->addr->sa_family == AF_INET) {
+          addr = inet_ntoa(((struct sockaddr_in*)addrs->addr)->sin_addr);
+          break;
+        }
+        addrs = addrs->next;
+      }
+      if (addr != NULL) {
+        sprintf(filterbuf, filter_exp,addr);
+        printf("%s\n", filterbuf);
+        dev = devsp->name;
+        break;
+      }
     } else {
       devsp = devsp->next;
     }
@@ -59,7 +73,7 @@ int beginCapture() {
   pcap_freealldevs(alldevsp);
 
   // Set the filter.
-  if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
+  if (pcap_compile(handle, &fp, filterbuf, 0, net) == -1) {
     printf("Invalid Filter: %s\n", filter_exp);
     exit(1);
   }
