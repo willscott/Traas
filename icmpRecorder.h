@@ -27,26 +27,6 @@ struct seqreq {
   int seq;
 };
 
-struct pktinfo {
-  // IP
-  struct ip iphdr;
-  // ICMP
-  unsigned char type;
-  unsigned char code;
-  unsigned short i_checksum;
-  unsigned int padding;
-  // IP [inner]
-  struct ip eiphdr;
-  // TCP [inner]
-  unsigned short sport;
-  unsigned short dport;
-  unsigned int seq;
-  unsigned int ack;
-  unsigned short flags;
-  unsigned short winsize;
-  unsigned short tcp_sum;
-};
-
 int beginCapture();
 void processPcap();
 void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes);

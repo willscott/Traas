@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <netinet/tcp.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include "icmpRecorder.h"
 #include "tcpServer.h"
 #include "tcpSender.h"
@@ -18,7 +21,7 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (dst port 8080 and dst host %s)";
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (src port 8080 and src host %s)";
   char filterbuf[256];
 
   // Find Device.
@@ -104,18 +107,31 @@ void processPcap() {
 }
 
 void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes) {
-  struct pktinfo *packet;
+  int linkhdrlen = 14;
+  struct ip* iphdr, *responsehdr;
+  struct tcphdr* tcphdr;
+  struct icmp* icmphdr;
+
+  int icmpLength = linkhdrlen + sizeof(struct ip) + sizeof(struct icmp) + sizeof(struct ip);
+  
   int i;
   unsigned short hop;
-  // TODO: should multiple packets be handled?
-  packet = (struct pktinfo*)bytes;
-  printf("got packet.\n");
-  if (header->caplen >= 66 && packet->iphdr.ip_p == 1) {
+
+  // Make sure it's valid IP.
+  iphdr = (struct ip*)(bytes + linkhdrlen);
+  if (iphdr->ip_hl != 5 || iphdr->ip_v != 4) {
+    return;
+  }
+
+  if (header->caplen >= icmpLength && iphdr->ip_p == 1) {
     // Enough to have tcp header through checksum:
-    // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
-    if (packet->eiphdr.ip_v == 4 && packet->eiphdr.ip_p == 6) {
+    // 14ether + 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
+    icmphdr = (struct icmp*)(bytes + linkhdrlen + sizeof(struct ip));
+    responsehdr = (struct ip*)(bytes + linkhdrlen + sizeof(struct ip) + sizeof(struct icmp));
+
+    if (responsehdr->ip_v == 4 && responsehdr->ip_p == 6) {
       // Original packet should have been ipv4 tcp.
-      for (i = 0; i < activeTraceCount; i++) {
+/*      for (i = 0; i < activeTraceCount; i++) {
         if (activeTraces[i]->to == packet->eiphdr.ip_dst.s_addr) {
           printf("got relevant traced packet.\n");
           // Part of active trace.
@@ -126,20 +142,19 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
           activeTraces[i]->recordedHops += 1;
           break;
         }
-      }
+      } */
+      printf("ICMP Time Exceed maybe seen :D\n");
     }
-  } else if (header->caplen >= 33 && packet->iphdr.ip_p == 6) {
+  } else if (header->caplen >= linkhdrlen + sizeof(struct ip) + sizeof(struct tcphdr) && iphdr->ip_p == 6) {
+    tcphdr = (struct tcphdr*)(bytes + linkhdrlen + sizeof(struct ip));
     // Log
-    seqnums[seqnumpos].to = packet->iphdr.ip_dst.s_addr;
-    seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->iphdr.ip_len -\
-        ((((char*)packet)[32] & 0xf0)>>2);
+    seqnums[seqnumpos].to = iphdr->ip_dst.s_addr;
+    seqnums[seqnumpos].seq = tcphdr->th_seq;
     struct in_addr des;
-    des.s_addr = packet->iphdr.ip_dst.s_addr;
+    des.s_addr = iphdr->ip_dst.s_addr;
     printf("seq recovered %s -> %d\n", inet_ntoa(des), seqnums[seqnumpos].seq);
     seqnumpos += 1;
     seqnumpos %= 100;
-  } else {
-    printf("ignoring packet with caplen %d, proto %d\n", header->caplen, packet->iphdr.ip_p);
   }
 };
 
