@@ -18,7 +18,7 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (tcp port 80 and src host localhost)";
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (tcp port 8080)";
 
   // Find Device.
   if (pcap_findalldevs(&alldevsp, errbuf)) {
@@ -68,6 +68,11 @@ int beginCapture() {
     exit(1);
   }
 
+  if (pcap_setnonblock(handle, 1, errbuf) == -1) {
+    printf("Nonblocking mode failed: %s\n", errbuf);
+    exit(1);
+  }
+
   // Initialize Sending.
   initSender();
 
@@ -75,10 +80,13 @@ int beginCapture() {
 };
 
 void processPcap() {
-  int ret = pcap_dispatch(handle, 0, handlePcap, 0);
+  int packet_count = 0;
+  int ret = pcap_dispatch(handle, -1, handlePcap, (u_char *)&packet_count);
   if (ret < 0) {
     pcap_perror(handle, "pcap");
   }
+  printf("%d packets seen, %d packets counted after select returns\n",
+  				    ret, packet_count);
 }
 
 void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *bytes) {
@@ -88,34 +96,36 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   // TODO: should multiple packets be handled?
   packet = (struct pktinfo*)bytes;
   printf("got packet.\n");
-  if (header->caplen >= 66 && packet->proto == 1) {
+  if (header->caplen >= 66 && packet->iphdr.ip_p == 1) {
     // Enough to have tcp header through checksum:
     // 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
-    if (packet->e_version == 4 && packet->e_proto == 6) {
+    if (packet->eiphdr.ip_v == 4 && packet->eiphdr.ip_p == 6) {
       // Original packet should have been ipv4 tcp.
       for (i = 0; i < activeTraceCount; i++) {
-        if (activeTraces[i]->to == packet->e_dest) {
+        if (activeTraces[i]->to == packet->eiphdr.ip_dst.s_addr) {
           printf("got relevant traced packet.\n");
           // Part of active trace.
           hop = activeTraces[i]->recordedHops;
-          activeTraces[i]->hops[hop].ip = packet->source;
-          activeTraces[i]->hops[hop].ttl = packet->e_ttl;
+          activeTraces[i]->hops[hop].ip = packet->iphdr.ip_src.s_addr;
+          activeTraces[i]->hops[hop].ttl = packet->eiphdr.ip_ttl;
           activeTraces[i]->hops[hop].len = header->len;
           activeTraces[i]->recordedHops += 1;
           break;
         }
       }
     }
-  } else if (header->caplen >= 33 && packet->proto == 6) {
+  } else if (header->caplen >= 33 && packet->iphdr.ip_p == 6) {
     // Log
-    seqnums[seqnumpos].to = packet->dest;
-    seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->length -\
+    seqnums[seqnumpos].to = packet->iphdr.ip_dst.s_addr;
+    seqnums[seqnumpos].seq = ((unsigned int*)packet)[9] + packet->iphdr.ip_len -\
         ((((char*)packet)[32] & 0xf0)>>2);
     struct in_addr des;
-    des.s_addr = packet->dest;
+    des.s_addr = packet->iphdr.ip_dst.s_addr;
     printf("seq recovered %s -> %d\n", inet_ntoa(des), seqnums[seqnumpos].seq);
     seqnumpos += 1;
     seqnumpos %= 100;
+  } else {
+    printf("ignoring packet with caplen %d, proto %d\n", header->caplen, packet->iphdr.ip_p);
   }
 };
 
