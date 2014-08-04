@@ -28,7 +28,6 @@ struct tcp_opt {
   unsigned int repl;
 };
 
-#define TCPHSIZE 32
 #define PTCPHSIZE 12
 #define IPHSIZE 20
 
@@ -95,7 +94,7 @@ void initSender() {
 
 };
 
-void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned int ack, unsigned char ttl) {
+void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned char ttl) {
   const char* payload = get302();
 
   struct sockaddr_in dest;
@@ -106,41 +105,45 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   struct tcp_pseudohdr* fake_hdr = (struct tcp_pseudohdr*)
       (data + IPHSIZE - sizeof(struct tcp_pseudohdr));
   unsigned short plen = strlen(payload);
+	unsigned short tcplen = 20;
   memset(data, 0, sizeof(data));
   dest.sin_family = AF_INET;
   dest.sin_addr.s_addr = to;
-  dest.sin_port = port;
+  dest.sin_port = req->th_sport;
 
   /* Fill in TCP */
   tcp_hdr->th_sport = htons(8080);
-  tcp_hdr->th_dport = port;
-  tcp_hdr->th_seq = seq;
-  tcp_hdr->th_ack = ack;
+  tcp_hdr->th_dport = req->th_sport;
+  tcp_hdr->th_seq = req->th_ack;
+  tcp_hdr->th_ack = req->th_seq;
   tcp_hdr->th_flags = TH_PUSH | TH_ACK;
   tcp_hdr->th_win = htons(122);
   tcp_hdr->th_sum = 0;
   tcp_hdr->th_off = 8;
 
-  /* Fill in Timestamp */
-  tcp_opt_hdr->nop = 1;
-  tcp_opt_hdr->nop2 = 1;
-  tcp_opt_hdr->kind = 8;
-  tcp_opt_hdr->len = 10;
-  tcp_opt_hdr->val = time(NULL);
-  tcp_opt_hdr->repl = 0;
+  /* Fill in Timestamp, optionally */
+  if (req->th_off >= 8) {
+    tcplen = 32;
+    tcp_opt_hdr->nop = 1;
+    tcp_opt_hdr->nop2 = 1;
+    tcp_opt_hdr->kind = 8;
+    tcp_opt_hdr->len = 10;
+    tcp_opt_hdr->val = *(unsigned int*)(req+28);
+    tcp_opt_hdr->repl = *(unsigned int*)(req+24);
+  }
 
   /* Fill in Pseudo header */
   fake_hdr->src = from;
   fake_hdr->dst = to;
   fake_hdr->zeros = 0;
   fake_hdr->proto = 6;
-  fake_hdr->len = htons(TCPHSIZE);
+  fake_hdr->len = htons(tcplen);
 
   /* Fill in payload */
-  memcpy(data + IPHSIZE + TCPHSIZE, payload, plen);
+  memcpy(data + IPHSIZE + tcplen, payload, plen);
 
   /* Compute TCP Checksum */
-  tcp_hdr->th_sum = checksum((unsigned short *) fake_hdr, TCPHSIZE + PTCPHSIZE + plen);
+  tcp_hdr->th_sum = checksum((unsigned short *) fake_hdr, tcplen + PTCPHSIZE + plen);
 
   /* Revert Pseudo header */
   memset(data, 0, IPHSIZE);
@@ -160,7 +163,7 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   //  ip_hdr->ip_src.s_addr = from;
   ip_hdr->ip_dst.s_addr = to;
 
-  if(sendto(osock, data, IPHSIZE + TCPHSIZE + plen, 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
+  if(sendto(osock, data, IPHSIZE + tcplen + plen, 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
     int errsv = errno;
     perror("sendto");
     printf("sendto() failed: %d\n", errsv);

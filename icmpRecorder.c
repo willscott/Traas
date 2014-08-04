@@ -152,7 +152,7 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
         // Latched on to active request.
         printf("seq recovered %s -> %d\n", inet_ntoa(iphdr->ip_src), tcphdr->th_ack);
         for (j = 1; j < MAX_HOPS; j++) {
-          craftPkt(activeTraces[i]->to, tcphdr->th_dport, sendingAddress, tcphdr->th_ack, tcphdr->th_seq, j);
+          craftPkt(activeTraces[i]->to, sendingAddress, tcphdr, j);
         }
         activeTraces[i]->sent = 1;
       }
