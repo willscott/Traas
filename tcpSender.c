@@ -128,8 +128,8 @@ void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned c
     tcp_opt_hdr->nop2 = 1;
     tcp_opt_hdr->kind = 8;
     tcp_opt_hdr->len = 10;
-    tcp_opt_hdr->val = *(unsigned int*)(req+28);
-    tcp_opt_hdr->repl = *(unsigned int*)(req+24);
+    tcp_opt_hdr->val = *((unsigned int*)(req)+7);
+    tcp_opt_hdr->repl = *((unsigned int*)(req)+6);
   }
 
   /* Fill in Pseudo header */
