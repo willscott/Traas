@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include "tcpSender.h"
+#include "httpFormatter.h"
 
 struct tcp_pseudohdr {
   unsigned int src;
@@ -85,7 +86,7 @@ void initSender() {
 };
 
 void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned char ttl) {
-  char* payload = "PING";
+  const char* payload = get302();
 
   struct sockaddr_in dest;
   char data[4096];
