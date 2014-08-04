@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#define __FAVOR_BSD
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
@@ -19,7 +20,7 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (src port 8080 and src host %s)";
+  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (dst port 8080 and dst host %s)";
   char filterbuf[256];
 
   // Find Device.
@@ -146,12 +147,12 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
     // see if this is for an active trace.
 
     for (i = 0; i < activeTraceCount; i++) {
-      if (activeTraces[i]->to == iphdr->ip_dst.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK &&
+      if (activeTraces[i]->to == iphdr->ip_src.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK &&
           activeTraces[i]->sent == 0) {
         // Latched on to active request.
-        printf("seq recovered %s -> %d\n", inet_ntoa(iphdr->ip_dst), tcphdr->th_seq);
-        for (j = 0; j < MAX_HOPS; j++) {
-          craftPkt(activeTraces[i]->to, tcphdr->th_dport, sendingAddress, tcphdr->th_seq, j);
+        printf("seq recovered %s -> %d\n", inet_ntoa(iphdr->ip_src), tcphdr->th_ack);
+        for (j = 1; j < MAX_HOPS; j++) {
+          craftPkt(activeTraces[i]->to, tcphdr->th_dport, sendingAddress, tcphdr->th_ack, tcphdr->th_seq, j);
         }
         activeTraces[i]->sent = 1;
       }

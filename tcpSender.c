@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <netinet/in.h>
+#define __FAVOR_BSD
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
 #include <sys/ioctl.h>
@@ -18,7 +19,16 @@ struct tcp_pseudohdr {
   unsigned short len;
 };
 
-#define TCPHSIZE 20
+struct tcp_opt {
+  unsigned char nop;
+  unsigned char nop2;
+  unsigned char kind;
+  unsigned char len;
+  unsigned int val;
+  unsigned int repl;
+};
+
+#define TCPHSIZE 32
 #define PTCPHSIZE 12
 #define IPHSIZE 20
 
@@ -85,15 +95,16 @@ void initSender() {
 
 };
 
-void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned char ttl) {
+void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned int seq, unsigned int ack, unsigned char ttl) {
   const char* payload = get302();
 
   struct sockaddr_in dest;
   char data[4096];
   struct ip* ip_hdr = (struct ip*) data;
-  struct tcphdr* tcp_hdr = (struct tcphdr*) (data + sizeof(struct ip));
+  struct tcphdr* tcp_hdr = (struct tcphdr*) (data + IPHSIZE);
+  struct tcp_opt* tcp_opt_hdr = (struct tcp_opt*) (data + IPHSIZE + sizeof(struct tcphdr));
   struct tcp_pseudohdr* fake_hdr = (struct tcp_pseudohdr*)
-      (data + sizeof(struct ip) - sizeof(struct tcp_pseudohdr));
+      (data + IPHSIZE - sizeof(struct tcp_pseudohdr));
   unsigned short plen = strlen(payload);
   memset(data, 0, sizeof(data));
   dest.sin_family = AF_INET;
@@ -104,10 +115,19 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   tcp_hdr->th_sport = htons(8080);
   tcp_hdr->th_dport = port;
   tcp_hdr->th_seq = seq;
-  tcp_hdr->th_ack = 0;
-  tcp_hdr->th_win = htons(65535);
+  tcp_hdr->th_ack = ack;
+  tcp_hdr->th_flags = TH_PUSH | TH_ACK;
+  tcp_hdr->th_win = htons(122);
   tcp_hdr->th_sum = 0;
-  tcp_hdr->th_off = 5;
+  tcp_hdr->th_off = 8;
+
+  /* Fill in Timestamp */
+  tcp_opt_hdr->nop = 1;
+  tcp_opt_hdr->nop2 = 1;
+  tcp_opt_hdr->kind = 8;
+  tcp_opt_hdr->len = 10;
+  tcp_opt_hdr->val = time(NULL);
+  tcp_opt_hdr->repl = 0;
 
   /* Fill in Pseudo header */
   fake_hdr->src = from;
@@ -123,7 +143,7 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   tcp_hdr->th_sum = checksum((unsigned short *) fake_hdr, TCPHSIZE + PTCPHSIZE + plen);
 
   /* Revert Pseudo header */
-  memset(data, 0, sizeof(struct ip));
+  memset(data, 0, IPHSIZE);
 
   /* Fill in IP */
   ip_hdr->ip_hl = 5;
@@ -131,8 +151,7 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   ip_hdr->ip_tos = 0;
   // packet len filled in by kernel.
   // ip_hdr->ip_len = htons(IPHSIZE + TCPHSIZE);
-  // packet id filled in when 0
-  // ip_hdr->ip_id = 0x1000;
+  ip_hdr->ip_id = 0x1000;
   ip_hdr->ip_off = htons(IP_DF);
   ip_hdr->ip_ttl = ttl; //TTL
   ip_hdr->ip_p = 6;
@@ -140,10 +159,6 @@ void craftPkt(unsigned int to, unsigned short port, unsigned int from, unsigned 
   // source address filled in when 0
   //  ip_hdr->ip_src.s_addr = from;
   ip_hdr->ip_dst.s_addr = to;
-
-  /* Compute IP Checksum */
-  // ip checksum auto-calculated by kernel.
-  //ip_hdr->ip_sum = checksum((unsigned short *)data, IPHSIZE);
 
   if(sendto(osock, data, IPHSIZE + TCPHSIZE + plen, 0, (struct sockaddr*)&dest, sizeof(dest)) == -1) {
     int errsv = errno;
