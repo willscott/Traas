@@ -6,11 +6,14 @@
 #include "icmpRecorder.h"
 #include "tcpServer.h"
 #include "tcpSender.h"
+#include "httpFormatter.h"
 
 pcap_t *handle;
 unsigned int sendingAddress;
 struct trace* activeTraces[MAX_CONNECTIONS];
 size_t activeTraceCount = 0;
+char logbuffer[4096];
+FILE* logfile;
 
 int beginCapture() {
   char* dev, errbuf[PCAP_ERRBUF_SIZE];
@@ -57,6 +60,13 @@ int beginCapture() {
     exit(1);
   }
   printf("Using Dev %s\n", dev);
+
+  // Initialize Log.
+  logfile = fopen("log.txt", "a");
+  if (logfile == NULL) {
+    printf("Couldn't open log file.\n");
+    exit(1);
+  }
 
   // Get Local IP.
   if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
@@ -182,19 +192,21 @@ void* beginTrace(int d, struct sockaddr_in* to) {
   return tr;
 };
 
-struct hop* showTrace(void* id) {
-  struct trace* r = (struct trace*)id;
-  return &(r->hops);
-};
+
 
 void cleanupTrace(void* id) {
   size_t i;
   for (i = activeTraceCount - 1; i > 0; i--) {
     if (activeTraces[i] == id) {
+      if (activeTraces[i]->sent > 0 && activeTraces[i]->recordedHops > 0) {
+        getjson(logbuffer, id);
+        fprintf(logfile, "%s\n", logbuffer);
+      } 
+      activeTraces[i] = activeTraces[activeTraceCount - 1];
+      activeTraceCount -= 1;
+      free(id);
       break;
     }
   }
-  activeTraces[i] = activeTraces[activeTraceCount - 1];
-  activeTraceCount -= 1;
-  free(id);
+
 };

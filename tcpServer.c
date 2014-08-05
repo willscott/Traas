@@ -125,6 +125,9 @@ int main() {
           //Disconnect
           if (len <= 0) {
             close(clients[i].d);
+            if (clients[i].traceid != NULL) {
+              cleanupTrace(clients[i].traceid);
+            }
             for (j = i + 1; j < numcon; ++j) {
               clients[j - 1] = clients[j];
               fds[j] = fds[j + 1];
@@ -140,6 +143,7 @@ int main() {
                 if (clients[i].traceid != NULL) {
                   printf("Stats\n");
                   send200(clients[i].d, (struct trace*)clients[i].traceid);
+                  cleanupTrace(clients[i].traceid);
                 } else {
                   send404(clients[i].d);
                 }
@@ -156,6 +160,9 @@ int main() {
                 for (j = i + 1; j < numcon; ++j) {
                   clients[j - 1] = clients[j];
                   fds[j] = fds[j + 1];
+                }
+                if (clients[i].traceid != NULL) {
+                  cleanupTrace(clients[i].traceid);
                 }
                 --numcon;
                 --i;

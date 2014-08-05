@@ -17,27 +17,33 @@ const char* get302() {
 
 int send200(int sock, struct trace* trace) {
   int cl;
-  int hops, maxHops;
   char head[255];
-  char buf[2048];
-  unsigned short pos = 0;
-  struct in_addr addr;
-  maxHops = 64;
-  pos += sprintf(buf, "[");
+  char buf[4096];
+  cl = getjson(buf, trace);
 
-  while (hops < trace->recordedHops) {
-    hops += 1;
-    addr.s_addr = trace->hops[hops].ip;
-    pos += sprintf(buf+pos, "{\"ttl\":%d, \"ip\":\"%s\"},\n", trace->hops[hops].ttl, inet_ntoa(addr));
-  }
   int len = strlen(summary);
   send(sock, summary, len, 0);
-  sprintf(buf+pos - 1, "]");
-  cl = strlen(buf);
   sprintf(head, "Content-Length: %d\r\n\r\n", cl);
   send(sock, head, strlen(head), 0);
   send(sock, buf, strlen(buf), 0);
   return 0;
+};
+
+int getjson(char* buffer, struct trace* trace) {
+  unsigned short hops = 0, pos = 0;
+  struct in_addr addr;
+
+  addr.s_addr = trace->to;
+  pos += sprintf(buffer, "{\"to\":\"%s\", \"hops\":[", inet_ntoa(addr));
+
+  while (hops < trace->recordedHops) {
+    hops += 1;
+    addr.s_addr = trace->hops[hops].ip;
+    pos += sprintf(buffer + pos,
+        "{\"ttl\":%d, \"ip\":\"%s\"},", trace->hops[hops].ttl, inet_ntoa(addr));
+  }
+  sprintf(buffer + pos - 1, "]}");
+  return strlen(buffer);
 };
 
 int send404(int sock) {

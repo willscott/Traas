@@ -34,7 +34,6 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
 
 void* beginTrace(int d, struct sockaddr_in* to);
 
-struct hop* showTrace(void* id);
 void cleanupTrace(void* id);
 
 #endif
