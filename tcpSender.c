@@ -32,8 +32,6 @@ struct tcp_opt {
 #define IPHSIZE 20
 
 unsigned short checksum(unsigned short *buffer, int size) {
-  // convert from num bytes to num shorts.
-  size = size >> 1;
   unsigned long cksum = 0;
   while(size > 1) {
     cksum += *buffer++;
@@ -94,7 +92,7 @@ void initSender() {
 
 };
 
-void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned char ttl) {
+void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned short reqlen, unsigned char ttl) {
   const char* payload = get302();
 
   struct sockaddr_in dest;
@@ -115,29 +113,31 @@ void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned c
   tcp_hdr->th_sport = htons(8080);
   tcp_hdr->th_dport = req->th_sport;
   tcp_hdr->th_seq = req->th_ack;
-  tcp_hdr->th_ack = req->th_seq;
+  tcp_hdr->th_ack = htonl(ntohl(req->th_seq) + reqlen);
   tcp_hdr->th_flags = TH_PUSH | TH_ACK;
   tcp_hdr->th_win = htons(122);
   tcp_hdr->th_sum = 0;
-  tcp_hdr->th_off = 8;
+  tcp_hdr->th_off = 5;
 
   /* Fill in Timestamp, optionally */
+  /*
   if (req->th_off >= 8) {
     tcplen = 32;
     tcp_opt_hdr->nop = 1;
     tcp_opt_hdr->nop2 = 1;
     tcp_opt_hdr->kind = 8;
     tcp_opt_hdr->len = 10;
-    tcp_opt_hdr->val = *((unsigned int*)(req)+7);
+    tcp_opt_hdr->val = htonl(time(NULL));
     tcp_opt_hdr->repl = *((unsigned int*)(req)+6);
   }
+  */
 
   /* Fill in Pseudo header */
   fake_hdr->src = from;
   fake_hdr->dst = to;
   fake_hdr->zeros = 0;
   fake_hdr->proto = 6;
-  fake_hdr->len = htons(tcplen);
+  fake_hdr->len = htons(tcplen + plen);
 
   /* Fill in payload */
   memcpy(data + IPHSIZE + tcplen, payload, plen);
@@ -154,7 +154,7 @@ void craftPkt(unsigned int to, unsigned int from, struct tcphdr* req, unsigned c
   ip_hdr->ip_tos = 0;
   // packet len filled in by kernel.
   // ip_hdr->ip_len = htons(IPHSIZE + TCPHSIZE);
-  ip_hdr->ip_id = 0x1000;
+  //ip_hdr->ip_id = 0x1000;
   ip_hdr->ip_off = htons(IP_DF);
   ip_hdr->ip_ttl = ttl; //TTL
   ip_hdr->ip_p = 6;

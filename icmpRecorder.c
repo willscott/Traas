@@ -113,6 +113,7 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   
   int i, j;
   unsigned short hop;
+  unsigned short reqlen;
 
   // Make sure it's valid IP.
   iphdr = (struct ip*)(bytes + linkhdrlen);
@@ -148,12 +149,13 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
 
     for (i = 0; i < activeTraceCount; i++) {
       if (activeTraces[i]->to == iphdr->ip_src.s_addr && (tcphdr->th_flags & (TH_ACK | TH_SYN)) == TH_ACK &&
-          activeTraces[i]->sent == 0 && iphdr->ip_len > 300) {
+          activeTraces[i]->sent == 0 && ntohs(iphdr->ip_len) > 100) {
+        reqlen = ntohs(iphdr->ip_len) - (iphdr->ip_hl << 2) - (tcphdr->th_off << 2);
         // Latched on to active request.
         printf("Recovered %s:%d -> [len:%d, seq:%d]\n", inet_ntoa(iphdr->ip_src), ntohs(tcphdr->th_sport), ntohs(iphdr->ip_len), tcphdr->th_ack);
-        for (j = 1; j < MAX_HOPS; j++) {
-          craftPkt(activeTraces[i]->to, sendingAddress, tcphdr, j);
-        }
+//        for (j = 1; j < MAX_HOPS; j++) {
+          craftPkt(activeTraces[i]->to, sendingAddress, tcphdr, reqlen, 64);
+//        }
         activeTraces[i]->sent = 1;
       }
     }
