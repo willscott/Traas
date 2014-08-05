@@ -8,7 +8,7 @@
 #ifndef   ICMP_H
 #define   ICMP_H
 
-#define MAX_HOPS 32
+#define MAX_HOPS 64
 
 struct hop {
   uint8_t ttl;

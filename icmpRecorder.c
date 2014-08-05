@@ -184,7 +184,7 @@ void* beginTrace(int d, struct sockaddr_in* to) {
 
 struct hop* showTrace(void* id) {
   struct trace* r = (struct trace*)id;
-  return r->hops;
+  return &(r->hops);
 };
 
 void cleanupTrace(void* id) {

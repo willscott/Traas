@@ -37,7 +37,7 @@ struct clientData {
   size_t state;
   size_t left;
   void* data;
-	void* traceid;
+  void* traceid;
 };
 
 void leave(int s) {
@@ -135,10 +135,19 @@ int main() {
             if (clients[i].state == 0) { // no data read yet.
               if (strncasecmp("GET / ", buf, 6) == 0) {
                 clients[i].state = 1;
-              } else {
+              } else if (strncasecmp("GET /result.json", buf, 16) == 0) {
                 // Summary statistics
-                printf("Statsing\n");
+                printf("Stats\n");
                 send200(clients[i].d, showTrace(clients[i].traceid));
+                close(clients[i].d);
+                for (j = i + 1; j < numcon; ++j) {
+                  clients[j - 1] = clients[j];
+                  fds[j] = fds[j + 1];
+                }
+                --numcon;
+                --i;
+              } else {
+                send404(clients[i].d);
                 close(clients[i].d);
                 for (j = i + 1; j < numcon; ++j) {
                   clients[j - 1] = clients[j];
