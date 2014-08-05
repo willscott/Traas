@@ -15,7 +15,7 @@ const char* get302() {
   return redirect;
 };
 
-int send200(int sock, struct hop* trace) {
+int send200(int sock, struct trace* trace) {
   int cl;
   int hops, maxHops;
   char head[255];
@@ -24,11 +24,11 @@ int send200(int sock, struct hop* trace) {
   struct in_addr addr;
   maxHops = 64;
   pos += sprintf(buf, "[");
-  while (trace != NULL && hops < maxHops) {
+
+  while (hops < trace->recordedHops) {
     hops += 1;
-    addr.s_addr = trace->ip;
-    pos += sprintf(buf+pos, "{\"ttl\":%d, \"ip\":\"%s\"},\n", trace->ttl, inet_ntoa(addr));
-    trace += 1;
+    addr.s_addr = trace->hops[hops].ip;
+    pos += sprintf(buf+pos, "{\"ttl\":%d, \"ip\":\"%s\"},\n", trace->hops[hops].ttl, inet_ntoa(addr));
   }
   int len = strlen(summary);
   send(sock, summary, len, 0);

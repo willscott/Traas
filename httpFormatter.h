@@ -4,5 +4,5 @@
 
 const char* get302();
 int send404(int sock);
-int send200(int sock, struct hop* trace);
+int send200(int sock, struct trace* trace);
 

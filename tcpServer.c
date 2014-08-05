@@ -137,8 +137,12 @@ int main() {
                 clients[i].state = 1;
               } else if (strncasecmp("GET /result.json", buf, 16) == 0) {
                 // Summary statistics
-                printf("Stats\n");
-                send200(clients[i].d, showTrace(clients[i].traceid));
+                if (clients[i].traceid != NULL) {
+                  printf("Stats\n");
+                  send200(clients[i].d, (struct trace*)clients[i].traceid);
+                } else {
+                  send404(clients[i].d);
+                }
                 close(clients[i].d);
                 for (j = i + 1; j < numcon; ++j) {
                   clients[j - 1] = clients[j];
@@ -206,6 +210,7 @@ int main() {
         gettimeofday(&clients[numcon].start, NULL);
         printf("accepted\n");
         clients[numcon].state = 0;
+        clients[numcon].traceid = NULL;
         if ((sockopt = fcntl(s, F_GETFL)) < 0) {
           perror("client options failure");
           exit(1);
