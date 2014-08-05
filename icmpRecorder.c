@@ -20,7 +20,7 @@ int beginCapture() {
   bpf_u_int32 net;
 
   struct bpf_program fp;
-  char filter_exp[] = "icmp[icmptype] == icmp-timxceed or (dst port 8080 and dst host %s)";
+  char filter_exp[] = "icmp[0:1] == 0x0b or (dst port 8080 and dst host %s)";
   char filterbuf[256];
 
   // Find Device.
@@ -109,8 +109,8 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   struct tcphdr* tcphdr;
   struct icmp* icmphdr;
 
-  int icmpLength = linkhdrlen + sizeof(struct ip) + sizeof(struct icmp) + sizeof(struct ip);
-  
+  int icmpLength = linkhdrlen + sizeof(struct ip) + 4 + sizeof(struct ip);
+
   int i, j;
   unsigned short hop;
   unsigned short reqlen;
@@ -124,24 +124,24 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   if (header->caplen >= icmpLength && iphdr->ip_p == 1) {
     // Enough to have tcp header through checksum:
     // 14ether + 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
-    icmphdr = (struct icmp*)(bytes + linkhdrlen + sizeof(struct ip));
-    responsehdr = (struct ip*)(bytes + linkhdrlen + sizeof(struct ip) + sizeof(struct icmp));
+    // TODO: buffer overflow attack here.
+    icmphdr = (struct icmp*)(bytes + linkhdrlen + (iphdr->ip_hl << 2));
+    responsehdr = (struct ip*)((char*)icmphdr + 8);
 
     if (responsehdr->ip_v == 4 && responsehdr->ip_p == 6) {
       // Original packet should have been ipv4 tcp.
-/*      for (i = 0; i < activeTraceCount; i++) {
-        if (activeTraces[i]->to == packet->eiphdr.ip_dst.s_addr) {
+      for (i = 0; i < activeTraceCount; i++) {
+        if (activeTraces[i]->to == responsehdr->ip_dst.s_addr) {
           printf("got relevant traced packet.\n");
           // Part of active trace.
           hop = activeTraces[i]->recordedHops;
-          activeTraces[i]->hops[hop].ip = packet->iphdr.ip_src.s_addr;
-          activeTraces[i]->hops[hop].ttl = packet->eiphdr.ip_ttl;
+          activeTraces[i]->hops[hop].ip = iphdr->ip_src.s_addr;
+          activeTraces[i]->hops[hop].ttl = iphdr->ip_ttl;
           activeTraces[i]->hops[hop].len = header->len;
           activeTraces[i]->recordedHops += 1;
           break;
         }
-      } */
-      printf("ICMP Time Exceed maybe seen :D\n");
+      }
     }
   } else if (header->caplen >= linkhdrlen + sizeof(struct ip) + sizeof(struct tcphdr) && iphdr->ip_p == 6) {
     tcphdr = (struct tcphdr*)(bytes + linkhdrlen + sizeof(struct ip));
