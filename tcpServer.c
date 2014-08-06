@@ -39,7 +39,7 @@ struct clientData {
   size_t left;
   void* data;
   void* traceid;
-  clock_t delay;
+  long unsigned delay;
 };
 
 void leave(int s) {
@@ -53,6 +53,7 @@ int main() {
   struct clientData clients[MAX_CONNECTIONS];
   int i, j, len;
   int sockopt, one = 1;
+  struct timeval now;
   char buf[MAX_LINE];
   struct pollfd fds[MAX_CONNECTIONS + 2];
 
@@ -120,7 +121,8 @@ int main() {
     }
     if (poll(fds, numcon + 2, 100)) {
       for (i = 0; i < numcon; ++i) {
-        if (clients[i].state == 4 && clock() > clients[i].delay + CLOCKS_PER_SEC) {
+        gettimeofday(&now, NULL);
+        if (clients[i].state == 4 && (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 1000000) {
           // Summary statistics
           if (clients[i].traceid != NULL) {
             send200(clients[i].d, (struct trace*)clients[i].traceid);
@@ -159,8 +161,8 @@ int main() {
               } else if (strncasecmp("GET /result.json", buf, 16) == 0) {
                 // Delay this request 1 second to give trace time to return.
                 clients[i].state = 4;
-                clients[i].delay = clock();
-                printf("Stats in 1 second compared to %d.\n", clock());
+                clients[i].delay = (unsigned long)now.tv_sec * 1000000 + now.tv_usec;
+                printf("Stats in 1 second compared.\n");
               } else {
                 send404(clients[i].d);
                 close(clients[i].d);

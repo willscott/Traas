@@ -199,6 +199,9 @@ void* beginTrace(int d, struct sockaddr_in* to) {
 
 
 void cleanupTrace(void* id) {
+  if (id == NULL || activeTraceCount == 0) {
+    return;
+  }
   size_t i;
   for (i = activeTraceCount - 1; i > 0; i--) {
     if (activeTraces[i] == id) {
