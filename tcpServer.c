@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "tcpServer.h"
 #include "httpFormatter.h"
@@ -38,6 +39,7 @@ struct clientData {
   size_t left;
   void* data;
   void* traceid;
+  clock_t delay;
 };
 
 void leave(int s) {
@@ -118,6 +120,22 @@ int main() {
     }
     if (poll(fds, numcon + 2, 100)) {
       for (i = 0; i < numcon; ++i) {
+        if (clients[i].state == 4 && clock() > clients[i].delay + CLOCKS_PER_SEC) {
+          // Summary statistics
+          if (clients[i].traceid != NULL) {
+            send200(clients[i].d, (struct trace*)clients[i].traceid);
+            cleanupTrace(clients[i].traceid);
+          } else {
+            send404(clients[i].d);
+          }
+          close(clients[i].d);
+          for (j = i + 1; j < numcon; ++j) {
+            clients[j - 1] = clients[j];
+            fds[j] = fds[j + 1];
+          }
+          --numcon;
+          --i;
+        }
         /* Read from an existing client */
         if (fds[i + 2].revents != 0) {
           //printf("got client event\n");
@@ -139,21 +157,10 @@ int main() {
               if (strncasecmp("GET / ", buf, 6) == 0) {
                 clients[i].state = 1;
               } else if (strncasecmp("GET /result.json", buf, 16) == 0) {
-                // Summary statistics
-                if (clients[i].traceid != NULL) {
-                  printf("Stats\n");
-                  send200(clients[i].d, (struct trace*)clients[i].traceid);
-                  cleanupTrace(clients[i].traceid);
-                } else {
-                  send404(clients[i].d);
-                }
-                close(clients[i].d);
-                for (j = i + 1; j < numcon; ++j) {
-                  clients[j - 1] = clients[j];
-                  fds[j] = fds[j + 1];
-                }
-                --numcon;
-                --i;
+                // Delay this request 1 second to give trace time to return.
+                clients[i].state = 4;
+                clients[i].delay = clock();
+                printf("Stats in 1 second compared to %d.\n", clock());
               } else {
                 send404(clients[i].d);
                 close(clients[i].d);
@@ -168,36 +175,26 @@ int main() {
                 --i;
               }
             }
-            if (clients[i].state == 3) {
-              printf("First ack received. Trace ready.\n");
-              clients[i].state = 4;
-            }
             if (clients[i].state == 1) {
               if(strstr(buf, "\r\n\r\n") != 0) {
-                clients[i].state = 3;
+                clients[i].state = 0;
                 clients[i].data = (void*)get302();
                 clients[i].left = strlen((char*)clients[i].data);
                 printf("End of Input!\n");
                 clients[i].traceid = beginTrace(clients[i].d, &clients[i].cin);
-              } else if (strlen(buf) > 2 && strncmp(&buf[strlen(buf) - 2], "\r\n", 2) == 0) {
+                clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
+              } else if (strlen(buf) > 2 && strncmp(&buf[strlen(buf) - 2], "\r\n\r\n", 4) == 0) {
                 clients[i].state = 2;
               }
-            } else if (clients[i].state == 2 && strncmp(buf, "\r\n", 2) == 0) {
-              clients[i].state = 3;
+            } else if (clients[i].state == 2 && strncmp(buf, "\r\n\r\n", 4) == 0) {
+              clients[i].state = 0;
               clients[i].data = (void*)get302();
               clients[i].left = strlen((char*)clients[i].data);
               printf("End of Input!\n");
               clients[i].traceid = beginTrace(clients[i].d, &clients[i].cin);
+              clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
             } else if (clients[i].state == 2) {
               clients[i].state = 1;
-            }
-
-            if (clients[i].state == 4) {
-              clients[i].left -= send(clients[i].d, clients[i].data, clients[i].left, 0);
-              if (clients[i].left <= 0) {
-                printf("done\n");
-                clients[i].state = 5;
-              }
             }
           }
         }

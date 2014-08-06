@@ -4,7 +4,8 @@
 
 const char* redirect = "HTTP/1.1 302 Found\r\n\
 Location: /result.json\r\n\
-Connection: Keep-Alive\r\n\r\n";
+Connection: Keep-Alive\r\n\
+Content-Length: 0\r\n\r\n";
 
 const char* notfound = "HTTP/1.1 404 Not Found\r\n";
 
@@ -47,6 +48,9 @@ int getjson(char* buffer, struct trace* trace) {
     }
     pos += sprintf(buffer + pos,
         "{\"ttl\":%d, \"ip\":\"%s\"},", ttl, inet_ntoa(addr));
+  }
+  if (trace->recordedHops == 0) {
+    pos += sprintf(buffer + pos, " ");
   }
   sprintf(buffer + pos - 1, "]}");
   return strlen(buffer);
