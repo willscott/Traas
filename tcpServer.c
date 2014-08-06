@@ -122,7 +122,8 @@ int main() {
     if (poll(fds, numcon + 2, 100)) {
       for (i = 0; i < numcon; ++i) {
         gettimeofday(&now, NULL);
-        if (clients[i].state == 4 && (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 1000000) {
+        if (clients[i].state == 4 && (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 2000000) {
+          printf("Stats now\n");
           // Summary statistics
           if (clients[i].traceid != NULL) {
             send200(clients[i].d, (struct trace*)clients[i].traceid);

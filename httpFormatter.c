@@ -52,7 +52,7 @@ int getjson(char* buffer, struct trace* trace) {
   if (trace->recordedHops == 0) {
     pos += sprintf(buffer + pos, " ");
   }
-  sprintf(buffer + pos - 1, "]}");
+  sprintf(buffer + pos - 1, "]}\n");
   return strlen(buffer);
 };
 

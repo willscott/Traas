@@ -203,12 +203,15 @@ void cleanupTrace(void* id) {
     return;
   }
   size_t i;
-  for (i = activeTraceCount - 1; i > 0; i--) {
+  printf("Cleanup called.\n");
+  for (i = activeTraceCount - 1; i >= 0; i--) {
     if (activeTraces[i] == id) {
+      printf("Cleanup found item to free\n");
       if (activeTraces[i]->sent > 0 && activeTraces[i]->recordedHops > 0) {
+        printf("writing to log.\n");
         getjson(logbuffer, id);
-        fprintf(logfile, "%s\n", logbuffer);
-      } 
+        fprintf(logfile, "%s", logbuffer);
+      }
       activeTraces[i] = activeTraces[activeTraceCount - 1];
       activeTraceCount -= 1;
       free(id);
