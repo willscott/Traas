@@ -26,7 +26,7 @@ int beginCapture() {
   char filter_exp[] = "icmp[0:1] == 0x0b or (dst port 8080 and dst host %s)";
   char filterbuf[256];
 
-  // Find Device.
+  // Find Device. Gets the first valid device.
   if (pcap_findalldevs(&alldevsp, errbuf)) {
     printf("Couldn't find Devices: %s \n", errbuf);
     exit(1);
@@ -125,7 +125,7 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   unsigned short hop;
   unsigned short reqlen;
 
-  // Make sure it's valid IP.
+  // Make sure it's a valid IP header.
   iphdr = (struct ip*)(bytes + linkhdrlen);
   if (iphdr->ip_hl != 5 || iphdr->ip_v != 4) {
     return;
@@ -134,11 +134,14 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
   if (header->caplen >= icmpLength && iphdr->ip_p == 1) {
     // Enough to have tcp header through checksum:
     // 14ether + 20 ip + 8 icmp + 20 ip + 18 (of 20+) tcp
-    // TODO: buffer overflow attack here.
-    icmphdr = (struct icmp*)(bytes + linkhdrlen + (iphdr->ip_hl << 2));
+    i = iphdr->ip_hl << 2;
+    icmphdr = (struct icmp*)(bytes + linkhdrlen + i);
     responsehdr = (struct ip*)((char*)icmphdr + 8);
-
-    if (responsehdr->ip_v == 4 && responsehdr->ip_p == 6) {
+    if (header->caplen < linkhdrlen + i + 8 + 20) {
+      // packet truncates inner header.
+      printf("ignoring truncated icmp response (being cautious).\n");
+      return;
+    } else if (responsehdr->ip_v == 4 && responsehdr->ip_p == 6) {
       // Original packet should have been ipv4 tcp.
       for (i = 0; i < activeTraceCount; i++) {
         if (activeTraces[i]->to == responsehdr->ip_dst.s_addr) {
@@ -153,8 +156,8 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
         }
       }
     }
-  } else if (header->caplen >= linkhdrlen + sizeof(struct ip) + sizeof(struct tcphdr) && iphdr->ip_p == 6) {
-    tcphdr = (struct tcphdr*)(bytes + linkhdrlen + sizeof(struct ip));
+  } else if (header->caplen >= linkhdrlen + (iphdr->ip_hl << 2) + sizeof(struct tcphdr) && iphdr->ip_p == 6) {
+    tcphdr = (struct tcphdr*)(bytes + linkhdrlen + (iphdr->ip_hl << 2));
     // see if this is for an active trace.
 
     for (i = 0; i < activeTraceCount; i++) {
@@ -162,7 +165,8 @@ void handlePcap(u_char *user, const struct pcap_pkthdr * header, const u_char *b
           activeTraces[i]->sent == 0 && ntohs(iphdr->ip_len) > 100) {
         reqlen = ntohs(iphdr->ip_len) - (iphdr->ip_hl << 2) - (tcphdr->th_off << 2);
         // Latched on to active request.
-        printf("Recovered %s:%d -> [len:%d, seq:%d]\n", inet_ntoa(iphdr->ip_src), ntohs(tcphdr->th_sport), ntohs(iphdr->ip_len), tcphdr->th_ack);
+        printf("Recovered %s:%d -> [len:%d, seq:%d]\n", inet_ntoa(iphdr->ip_src),
+               ntohs(tcphdr->th_sport), ntohs(iphdr->ip_len), tcphdr->th_ack);
         for (j = 1; j < MAX_HOPS; j++) {
           craftPkt(activeTraces[i]->to, sendingAddress, tcphdr, reqlen, j);
         }

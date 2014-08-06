@@ -30,7 +30,7 @@ int send200(int sock, struct trace* trace) {
 };
 
 int getjson(char* buffer, struct trace* trace) {
-  unsigned short hops = 0, pos = 0;
+  unsigned short hops = 0, pos = 0, ttl;
   struct in_addr addr;
 
   addr.s_addr = trace->to;
@@ -39,8 +39,14 @@ int getjson(char* buffer, struct trace* trace) {
   while (hops < trace->recordedHops) {
     hops += 1;
     addr.s_addr = trace->hops[hops].ip;
+    ttl = trace->hops[hops].ttl;
+    if (ttl < 64) {
+      ttl = 64 - ttl;
+    } else if (ttl < 255) {
+      ttl = 255 - ttl;
+    }
     pos += sprintf(buffer + pos,
-        "{\"ttl\":%d, \"ip\":\"%s\"},", trace->hops[hops].ttl, inet_ntoa(addr));
+        "{\"ttl\":%d, \"ip\":\"%s\"},", ttl, inet_ntoa(addr));
   }
   sprintf(buffer + pos - 1, "]}");
   return strlen(buffer);
