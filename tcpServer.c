@@ -120,9 +120,11 @@ int main() {
       error = 0;
     }
     if (poll(fds, numcon + 2, 100)) {
+      gettimeofday(&now, NULL);
       for (i = 0; i < numcon; ++i) {
-        gettimeofday(&now, NULL);
-        if (clients[i].state == 4 && (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 2000000) {
+        if ((clients[i].state == 4 && (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 3000000) ||
+            (clients[i].state == 0 && clients[i].traceid != NULL &&
+             (unsigned long)now.tv_sec * 1000000 + now.tv_usec > clients[i].delay + 5000000)) {
           printf("Stats now\n");
           // Summary statistics
           if (clients[i].traceid != NULL) {
@@ -181,6 +183,7 @@ int main() {
             if (clients[i].state == 1) {
               if(strstr(buf, "\r\n\r\n") != 0) {
                 clients[i].state = 0;
+                clients[i].delay = (unsigned long)now.tv_sec * 1000000 + now.tv_usec;
                 clients[i].data = (void*)get302();
                 clients[i].left = strlen((char*)clients[i].data);
                 printf("End of Input!\n");
@@ -191,6 +194,7 @@ int main() {
               }
             } else if (clients[i].state == 2 && strncmp(buf, "\r\n\r\n", 4) == 0) {
               clients[i].state = 0;
+              clients[i].delay = (unsigned long)now.tv_sec * 1000000 + now.tv_usec;
               clients[i].data = (void*)get302();
               clients[i].left = strlen((char*)clients[i].data);
               printf("End of Input!\n");
